@@ -1,5 +1,5 @@
 /* Service Worker — Network-First con respaldo 100% Offline */
-const CACHE_NAME = "g09-offline-v1.0.1";
+const CACHE_NAME = "g09-offline-v1.0.2";
 const CORE_ASSETS = [
   "./",
   "./index.html",
