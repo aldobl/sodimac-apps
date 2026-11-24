@@ -1,5 +1,5 @@
 /* Service Worker — Network-First con respaldo 100% Offline */
-const CACHE_NAME = "g09-offline-v1.0.2";
+const CACHE_NAME = "g09-offline-v1.1.0";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -10,6 +10,11 @@ const CORE_ASSETS = [
   "./icon-192.png",
   "./icon-512.png"
 ];
+const EXTERNAL_OFFLINE_LIBS = [
+  "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"
+];
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -18,6 +23,12 @@ self.addEventListener("install", event => {
         try {
           const res = await fetch(new Request(asset, { cache: "reload" }));
           if (res && res.ok) await cache.put(asset, res);
+        } catch (e) {}
+      }
+      for (const extUrl of EXTERNAL_OFFLINE_LIBS) {
+        try {
+          const res = await fetch(new Request(extUrl, { mode: "cors", cache: "reload" }));
+          if (res && res.ok) await cache.put(extUrl, res);
         } catch (e) {}
       }
     }).then(() => self.skipWaiting())
@@ -36,7 +47,24 @@ self.addEventListener("fetch", event => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) {
+    if (EXTERNAL_OFFLINE_LIBS.includes(req.url)) {
+      event.respondWith(
+        caches.open(CACHE_NAME).then(async cache => {
+          const cached = await cache.match(req.url);
+          if (cached) return cached;
+          try {
+            const fresh = await fetch(req);
+            if (fresh && fresh.ok) cache.put(req.url, fresh.clone());
+            return fresh;
+          } catch (e) {
+            return new Response("", { status: 503 });
+          }
+        })
+      );
+    }
+    return;
+  }
 
   event.respondWith(
     caches.open(CACHE_NAME).then(async cache => {
